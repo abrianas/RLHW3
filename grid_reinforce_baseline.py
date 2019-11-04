@@ -56,20 +56,18 @@ class DiscreteSoftmaxPolicy(object):
     # and a step size. adjust self.weights
     def gradient_step(self, grad, step_size):
         self.weights += step_size*grad
-        return
 
 
 class ValueEstimator(object): ###
-    def __init__(self, num_states, num_actions):
+    def __init__(self, num_states):
         self.num_states = num_states
-        self.num_actions = num_actions 
         
         # initial value estimates or weights of the value estimator are set to zero. 
         self.values = np.zeros((self.num_states))
 
     # TODO: fill this function in
     # takes in a state and predicts a value for the state
-    def predict(self,state): ###
+    def predict(self, state): ###
         value_predicted = self.values[state]
         return value_predicted
 
@@ -79,13 +77,11 @@ class ValueEstimator(object): ###
     def update(self, state, value_estimate, target, value_step_size): ###
         gradientV = np.zeros((self.num_states)) # will store the gradient of value_estimate
         gradientV[state] = 1 # take the gradient of the state-value estimate
-        delta = abs(target-value_estimate)
-        #delta = ((target-value_estimate)**2)
-        #delta = (target-value_estimate)
+        #delta = abs(target-value_estimate)
+        delta = (target-value_estimate)**2
         #print(target)
         #print(value_estimate)
         self.values += value_step_size*delta*gradientV 
-        #print(self.values)
         return
 
 
@@ -94,7 +90,6 @@ class ValueEstimator(object): ###
 # and returns a list of discounted rewards
 # Ex. get_discounted_returns([1, 1, 1], 0.5)
 # should return [1.75, 1.5, 1]
-
 def get_discounted_returns(rewards, gamma):
     discount = np.zeros(len(rewards))
     temp = 0
@@ -113,7 +108,7 @@ def get_discounted_returns(rewards, gamma):
 # make sure to add in the baseline computation here. 
 # Using the computed baseline, compute the advantage
 # Use this advantage in the policy gradient calculation
-def reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate):
+def reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, base_flag):
     episode_rewards = []
     value_step_size = 0.009;
     
@@ -147,7 +142,10 @@ def reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate):
         
         # Calculate the gradients and perform policy weights update
         for i in range(len(episode_log[:,0])):
-            value_estimate = value_estimator.predict(episode_log[i,0])
+            if base_flag: # reinforce with baseline
+                value_estimate = value_estimator.predict(episode_log[i,3])
+            else: # reinforce w/o baseline
+                value_estimate = 0
             advantage = (target[i] - value_estimate) ###
             grads = policy.compute_gradient(episode_log[i,0], episode_log[i,1], (gamma**i)*discount[i],
                 (gamma**i)*advantage)
@@ -174,8 +172,8 @@ if __name__ == "__main__":
     env = GridWorld(MAP2)
     env.print()
     policy = DiscreteSoftmaxPolicy(env.get_num_states(), env.get_num_actions(), temperature)
-    value_estimator = ValueEstimator(env.get_num_states(), env.get_num_actions())
-    episode_rewards = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate)
+    value_estimator = ValueEstimator(env.get_num_states())
+    episode_rewards = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, true)
     plt.plot(np.arange(num_episodes),episode_rewards)
     plt.xlabel("Number of Episodes")
     plt.ylabel("Total Rewards")
