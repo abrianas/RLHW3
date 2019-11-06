@@ -110,13 +110,14 @@ def get_discounted_returns(rewards, gamma):
 # Use this advantage in the policy gradient calculation
 def reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, base_flag):
     episode_rewards = []
-    value_step_size = 0.009;
+    value_step_size = 0.0000005
     
     # Remember to update the weights after each episode, not each step
     for e in range(num_episodes):
         state = env.reset()
         episode_log = []
         rewards = []
+        target = []
         score = 0
         
         done = False
@@ -126,8 +127,8 @@ def reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, 
             next_state, reward, done = env.step(action)
             
             # Append results to the episode log
-            episode_log.append([state, action, reward, next_state])
-            state = next_state
+            episode_log.append([state, action, reward])
+            
             
             # Save reward in memory for self.weights updates
             score += reward
@@ -139,16 +140,18 @@ def reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, 
                 discount = get_discounted_returns(rewards, gamma)
                 target = np.asarray(discount) ###
                 break
-        
+                
+            state = next_state
+            
         # Calculate the gradients and perform policy weights update
         for i in range(len(episode_log[:,0])):
             if base_flag: # reinforce with baseline
-                value_estimate = value_estimator.predict(episode_log[i,3])
+                value_estimate = value_estimator.predict(episode_log[i,0])
             else: # reinforce w/o baseline
                 value_estimate = 0
-            advantage = (target[i] - value_estimate) ###
-            grads = policy.compute_gradient(episode_log[i,0], episode_log[i,1], (gamma**i)*discount[i],
-                (gamma**i)*advantage)
+            advantage = target[i] - value_estimate ###
+            grads = policy.compute_gradient(episode_log[i,0], episode_log[i,1], discount[i],
+                advantage)
             
             # update weight parameters
             value_estimator.update(episode_log[i,0], value_estimate, target[i], value_step_size) ###
@@ -166,17 +169,20 @@ def reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, 
 
 if __name__ == "__main__":
     num_episodes = 20000
-    learning_rate = 0.01
+    learning_rate = 0.001
     gamma = 0.5
-    temperature = 5; # temperature must be tuned.
+    temperature = 1 # temperature must be tuned.
     env = GridWorld(MAP2)
     env.print()
     policy = DiscreteSoftmaxPolicy(env.get_num_states(), env.get_num_actions(), temperature)
     value_estimator = ValueEstimator(env.get_num_states())
-    episode_rewards = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, true)
-    plt.plot(np.arange(num_episodes),episode_rewards)
+    episode_rewards2 = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, False)
+    episode_rewards = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, True)
+    plt.plot(np.arange(num_episodes), episode_rewards, label='reinforce w/ baseline')
+    plt.plot(np.arange(num_episodes), episode_rewards2, label='reinfoce w/o baseline')
     plt.xlabel("Number of Episodes")
     plt.ylabel("Total Rewards")
+    plt.legend()
     plt.show()
     
     #Test time
