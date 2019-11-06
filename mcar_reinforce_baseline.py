@@ -9,13 +9,19 @@ N_POS = 15
 N_VEL = 12
 
 class DiscreteSoftmaxPolicy(object):
-    def __init__(self, num_states, num_actions):
+    def __init__(self, num_states, action_grid):
         self.num_states = num_states 
-        self.num_actions = num_actions
+        self.action_grid = action_grid
+        self.num_actions = len(self.action_grid)
+        #self.num_actions = num_actions
         # here are the weights for the policy - you may change this initialization       
         self.weights = np.zeros((self.num_states, self.num_actions))
 
-
+    def softmax(self):
+        num=np.exp(self.weights)
+        pi=np.atleast_2d(1/np.sum(num,axis=1)).T*num
+        return pi
+        
     # TODO: fill this function in    
     # it should take in an environment state
     def act(self, state):
@@ -65,7 +71,13 @@ class ValueEstimator(object):
     # construct a suitable loss function and use it to update the 
     # values of the value estimator. choose suitable step size for updating the value estimator
     def update(self,state, value_estimate, target, value_step_size):
-        pass
+        gradientV = np.zeros((self.num_states)) # will store the gradient of value_estimate
+        gradientV[state] = 1 # take the gradient of the state-value estimate
+        #delta = abs(target-value_estimate)
+        delta = (target-value_estimate)**2
+        self.values += value_step_size*delta*gradientV 
+        return
+
 
 
 # TODO: fill this function in
@@ -90,8 +102,9 @@ def get_discounted_returns(rewards, gamma):
 # make sure to add in the baseline computation here. 
 # Using the computed baseline, compute the advantage. 
 # Use this advantage in the policy gradient calculation
-def reinforce(env, policy, value_estimator gamma, num_episodes, learning_rate):
+def reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, state_grid):
     episode_rewards = []
+    value_step_size = 0.0000005
     e=0
     while e<=num_episodes:
         state = env.reset()
@@ -103,10 +116,11 @@ def reinforce(env, policy, value_estimator gamma, num_episodes, learning_rate):
 
         while done == False and iter < 1000:
             # get action
-
             action,action_index = policy.act(state)
+            
             # get next step, reward and chek whether reached goal
             next_state, reward, done, blah= env.step(action)
+            
             # store the state, action, reward and next state
             episode_log.append([state, action_index, reward, next_state])
 
@@ -119,25 +133,30 @@ def reinforce(env, policy, value_estimator gamma, num_episodes, learning_rate):
         
         episode_rewards.append(np.sum(rewards))
         e+=1
-#        print(done,iter,e,np.round(np.sum(rewards)))
-        if e>5000 or done:
-#            print('gradient step')            
+        if e>5000 or done:           
             discount_rewards = get_discounted_returns(rewards, gamma)
+            target = np.asarray(discount_rewards)
             for t in range(0,len(episode_log)):
-                grads = policy.compute_gradient(episode_log[t,0], episode_log[t,1],discount_rewards[t])
+                value_estimate = value_estimator.predict(episode_log[t,0])
+                advantage = target[t] - value_estimate
+                grads = policy.compute_gradient(episode_log[t,0], episode_log[t,1], discount_rewards[t],
+                advantage)
+                
+                # update weight parameters
+                value_estimator.update(episode_log[t,0], value_estimate, target[t], value_step_size)
                 policy.gradient_step(grads, learning_rate)
 
     return episode_rewards
     
+    
 def discretize(state, grid):
-
     s = np.zeros([len(state),1])
     nX=len(grid[0])+1
     nV=len(grid[1])+1
     for l in range(0,len(grid)):
-#        print(l)
+
         s[l] = np.digitize(state[l], grid[0])
-#    print(state, s)
+
     ind=np.reshape(np.arange(nV*nX),[nX,nV])
     state_index=ind[int(s[0]),int(s[1])]
     return state_index
@@ -157,20 +176,32 @@ if __name__ == "__main__":
     learning_rate = 0.0001
     env = Continuous_MountainCarEnv()
     num_actions = 3
-    num_states = N_POS * N_VEL #if you wish you can choose a different value.
+    num_states = N_POS * N_VEL # if you wish you can choose a different value.
 
-    policy = DiscreteSoftmaxPolicy(num_states, num_actions)
-    value_estimator = ValueEstimator(num_states)
-    reinforce(env, policy, value_estimator,  gamma, num_episodes, learning_rate)
+    state_high = env.high_state
+    state_low = env.low_state
 
-    #Test time
-    state = env.reset()
-    env.print()
-    done = False
-    while not done:
-        input("press enter:")
-        action = policy.act(state)
-        state, reward, done = env.step(action)
-        # env.print()
+    action_high = [env.max_action]
+    action_low = [env.min_action]
+
+    state_grid = create_grid(state_low, state_high, bins=(3,3))
+    action_grid = np.linspace(action_low,action_high,3)
+
+    R=[]
+    for t in range(1):
+        policy = DiscreteSoftmaxPolicy(9, action_grid)
+        value_estimator = ValueEstimator(9)
+        r=reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, state_grid)
+        R.append(r)
+    
+    # r_min=np.min(np.array(R),axis=0)
+    # r_max=np.max(np.array(R),axis=0)
+    # plt.figure()
+    # plt.plot(r_min)
+    # plt.plot(r_max)
+    
+    # plt.figure()
+    # for i in range(5):
+        # plt.plot(R[i])
 
 
