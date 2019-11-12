@@ -190,12 +190,18 @@ if __name__ == "__main__":
     state_grid = create_grid(state_low, state_high, bins=(3,3))
     action_grid = np.linspace(action_low, action_high,3)
 
+    # start with a new policy before calling reinforce
     policy = DiscreteSoftmaxPolicy(num_states, action_grid)
     value_estimator = ValueEstimator(num_states)
     episode_rewards2 = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, 
     state_grid, False)
+    
+    # start with a new policy before calling reinforce
+    policy = DiscreteSoftmaxPolicy(num_states, action_grid)
     episode_rewards = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, 
     state_grid, True)
+    
+    # plot reinforce with and without baseline for comparison
     plt.plot(episode_rewards, label='reinforce w/ baseline')
     plt.plot(episode_rewards2, label='reinfoce w/o baseline')
     plt.xlabel("Number of Episodes")
