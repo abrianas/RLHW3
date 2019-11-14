@@ -169,35 +169,41 @@ def reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, 
 
 if __name__ == "__main__":
     num_episodes = 20000
-    learning_rate = 0.001
+    learning_rate = 0.01
     gamma = 0.5
     temperature = 1 # temperature must be tuned.
     env = GridWorld(MAP2)
     env.print()
-    # policy = DiscreteSoftmaxPolicy(env.get_num_states(), env.get_num_actions(), temperature)
-    # value_estimator = ValueEstimator(env.get_num_states())
-    # episode_rewards2 = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, False)
-    # episode_rewards = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, True)
-    # plt.plot(np.arange(num_episodes), episode_rewards, label='reinforce w/ baseline')
-    # plt.plot(np.arange(num_episodes), episode_rewards2, label='reinfoce w/o baseline')
-    # plt.xlabel("Number of Episodes")
-    # plt.ylabel("Total Rewards")
-    # plt.legend()
-    # plt.show()
     
-    # #Test time
-    # state = env.reset()
-    # env.print()
-    # done = False
-    # while not done:
-        # input("press enter:")
-        # action = policy.act(state)
-        # state, reward, done = env.step(action)
-        # env.print()
+    # define the policy and the value estimator
+    policy = DiscreteSoftmaxPolicy(env.get_num_states(), env.get_num_actions(), temperature)
+    value_estimator = ValueEstimator(env.get_num_states())
+    episode_rewards2 = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, False)
+    value_estimator = ValueEstimator(env.get_num_states())
+    policy = DiscreteSoftmaxPolicy(env.get_num_states(), env.get_num_actions(), temperature)
+    episode_rewards = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, True)
+    
+    # Plot the training curves
+    plt.plot(np.arange(num_episodes), episode_rewards, label='reinforce w/ baseline')
+    plt.plot(np.arange(num_episodes), episode_rewards2, label='reinfoce w/o baseline')
+    plt.xlabel("Number of Episodes")
+    plt.ylabel("Total Rewards")
+    plt.legend()
+    plt.show()
+    
+    #Test time
+    state = env.reset()
+    env.print()
+    done = False
+    while not done:
+        input("press enter:")
+        action = policy.act(state)
+        state, reward, done = env.step(action)
+        env.print()
         
     # Runs reinforce algorithm 20 times training on 20,000 episodes each time 
     # and counts the number of times the goal is reached
-    trials = 20
+    trials = 2
     for t in range(trials):
         print(t+1) # prints out the trial number
         num_goals = 0
@@ -207,9 +213,16 @@ if __name__ == "__main__":
         for e in range(len(episode_rewards)):
             if episode_rewards[e] > 0:
                 num_goals+=1
-            # else: # to look at policies that do not reach the goal
-                # print(episode_rewards[e])
+            else: # to look at policies that do not reach the goal
+                print(episode_rewards[e])
+                # state = env.reset()
                 # env.print()
+                # done = False
+                # while not done:
+                    # input("press enter:")
+                    # action = policy.act(state)
+                    # state, reward, done = env.step(action)
+                    # env.print()
         print(num_goals)    
 
 
