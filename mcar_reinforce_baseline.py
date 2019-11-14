@@ -174,7 +174,7 @@ def create_grid(low, high, bins):
 
 if __name__ == "__main__":
     gamma = 0.9
-    num_episodes = 5000
+    num_episodes = 20000
     learning_rate = 0.0001
     env = Continuous_MountainCarEnv()
     num_actions = 3
@@ -190,12 +190,18 @@ if __name__ == "__main__":
     state_grid = create_grid(state_low, state_high, bins=(3,3))
     action_grid = np.linspace(action_low, action_high,3)
 
+    # start with a new policy before calling reinforce
     policy = DiscreteSoftmaxPolicy(num_states, action_grid)
     value_estimator = ValueEstimator(num_states)
     episode_rewards2 = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, 
     state_grid, False)
+    
+    # start with a new policy before calling reinforce
+    policy = DiscreteSoftmaxPolicy(num_states, action_grid)
     episode_rewards = reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, 
     state_grid, True)
+    
+    # plot reinforce with and without baseline for comparison
     plt.plot(episode_rewards, label='reinforce w/ baseline')
     plt.plot(episode_rewards2, label='reinfoce w/o baseline')
     plt.xlabel("Number of Episodes")
@@ -203,11 +209,13 @@ if __name__ == "__main__":
     plt.legend()
     plt.show()
     
+    # # Re-train at least 5 times to provide an upper and lower limit for the observed reward 
+    # # at each training step index
     # R=[]
-    # for t in range(1):
-        # policy = DiscreteSoftmaxPolicy(9, action_grid)
-        # value_estimator = ValueEstimator(9)
-        # r=reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, state_grid)
+    # for t in range(5):
+        # policy = DiscreteSoftmaxPolicy(num_states, action_grid)
+        # value_estimator = ValueEstimator(num_states)
+        # r=reinforce(env, policy, value_estimator, gamma, num_episodes, learning_rate, state_grid, True)
         # R.append(r)
     
     # r_min=np.min(np.array(R),axis=0)
@@ -219,5 +227,5 @@ if __name__ == "__main__":
     # plt.figure()
     # for i in range(5):
         # plt.plot(R[i])
-
+    # plt.show()
 
