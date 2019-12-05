@@ -20,7 +20,7 @@ class Continuous_Pendulum:
         high = np.array([1., 1., self.max_speed])
         self.action_space = np.array([self.max_torque, -self.max_torque])
         self.observation_space = np.array([-high, high])
-	
+
 
         self.iter = 0
         self.maxiter = 200
@@ -78,9 +78,3 @@ if __name__ == "__main__":
         rewards.append(reward)
 
     print(len(rewards))
-
-
-
-
-
-

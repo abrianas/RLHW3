@@ -4,7 +4,7 @@ import scipy.signal
 import pdb
 import matplotlib.pyplot as plt
 from pendulum import *
-import pdb
+
 
 class ContinuousPolicy(object):
     def __init__(self, num_states, num_actions, no_rbf):
@@ -18,7 +18,7 @@ class ContinuousPolicy(object):
     # TODO: fill this function in
     # it should take in an environment state
     def act(self, state):
-        sigma = 0.9
+        sigma = 1.0
         action = np.random.normal(np.dot(self.weights.T,state),sigma)
 
         return action
@@ -30,10 +30,10 @@ class ContinuousPolicy(object):
     # return the gradient, a (self.num_states, self.num_actions) numpy array
     def compute_gradient(self, state, action,discount, advantage):
 
-        sigma = 0.9
+        sigma = 1.0
 
         grad = ((action - np.dot(self.weights.T,state))/sigma**2)*state
-        pdb.set_trace()
+
         grad = advantage*grad
 
         return grad
@@ -41,7 +41,7 @@ class ContinuousPolicy(object):
     # takes a step of gradient ascent given a gradient (from compute_gradient())
     # and a step size. adjust self.weights
     def gradient_step(self, grad, step_size):
-        #self.weights = self.weights + grad*step_size
+        #self.weights = self.weights + grad*step_size0
         self.weights = self.weights + np.reshape(grad,[-1,1])*step_size
 
 
@@ -56,7 +56,6 @@ class LinearValueEstimator(object):
     #takes in a state and predicts a value for the state
     def predict(self,state):
         ## here state is the rbf feacture vector
-
         value_predicted  = np.matmul(state,self.weights_v.T)
         return value_predicted
 
@@ -69,6 +68,8 @@ class LinearValueEstimator(object):
         gradientV = state
 
         self.weights_v = self.weights_v + value_step_size*delta*gradientV
+
+
 
 
 # TODO: fill this function in
@@ -102,9 +103,10 @@ def reinforce(env, policy, value_estimator, gamma, num_episodes,value_step_size,
     for e in range(num_episodes):
         print(e)
         state = env.reset()
-        state = compute2dstate(state)
+        state = state_normalize(state)
 
         feature_state = rbf(state, centers, rbf_sigma)
+
 
         episode_log = []
         iter = 0
@@ -117,7 +119,7 @@ def reinforce(env, policy, value_estimator, gamma, num_episodes,value_step_size,
 
             # get next step, reward and chek whether reached goal
             next_state, reward, done, blah= env.step(action)
-            next_state = compute2dstate(next_state)
+            next_state = state_normalize(next_state)
 
             # store the state, action, reward and next state
             episode_log.append([feature_state, action, reward, next_state])
@@ -129,7 +131,7 @@ def reinforce(env, policy, value_estimator, gamma, num_episodes,value_step_size,
         episode_log = np.asarray(episode_log)
         rewards = episode_log[:,2]
         episode_rewards.append(np.sum(rewards))
-
+        # print(np.sum(rewards))
         if done:
 
 
@@ -150,9 +152,19 @@ def reinforce(env, policy, value_estimator, gamma, num_episodes,value_step_size,
     return episode_rewards
 
 def compute2dstate(state):
-    theta = np.arctan(state[1]/state[0])
+    theta = np.arctan2(state[1],state[0])
+    if np.isnan(theta):
+        pdb.set_trace()
     state_2d = np.array([theta, state[2]])
     return state_2d
+
+# def state_normalize(state):
+#  return np.array([state[0]/np.pi, state[1]/8.0])
+
+def state_normalize(state):
+
+    return np.array([state[0],state[1],state[2]/8.0])
+
 
 
 def rbf(state, centers, rbf_sigma):
@@ -161,64 +173,94 @@ def rbf(state, centers, rbf_sigma):
     for c in range(0, len(centers)):
         rbf_eval =  np.exp(-np.linalg.norm(state - centers[c,:])**2/(2*(rbf_sigma**2)))
         phi.append(rbf_eval)
+
+
     return np.asarray(phi)
 
-def computeRBFcenters(th_low, th_high, th_dot_low, th_dot_high, no_rbf):
-    theta = np.linspace(th_low, th_high, no_rbf)
-    thetadot = np.linspace(th_dot_low, th_dot_high, no_rbf)
-    theta_c, thetadot_c = np.meshgrid(theta, thetadot)
+# def computeRBFcenters(th_low, th_high, th_dot_low, th_dot_high, no_rbf):
+#     theta = np.linspace(th_low, th_high, no_rbf)
+#     thetadot = np.linspace(th_dot_low, th_dot_high, no_rbf)
+#     theta_c, thetadot_c = np.meshgrid(theta, thetadot)
+#     centers = []
+#
+#     for i in range(0,no_rbf):
+#         for j in range(0,no_rbf):
+#             c = [theta_c[i,j], thetadot_c[i,j]]
+#             centers.append(c)
+#
+#     centers = np.asarray(centers)
+#     return centers
+#
+def computeRBFcenters(high,low,no_rbf):
+    theta_cos = np.linspace(low[0],high[0], no_rbf)
+    theta_sin = np.linspace(low[1],high[1], no_rbf)
+    theta_dot = np.linspace(low[2],high[2], no_rbf)
+    theta_cos_c, theta_sin_c, theta_dot_c = np.meshgrid(theta_cos,theta_sin, theta_dot)
     centers = []
 
     for i in range(0,no_rbf):
         for j in range(0,no_rbf):
-            c = [theta_c[i,j], thetadot_c[i,j]]
-            centers.append(c)
+            for k in range(0,no_rbf):
+                c = [theta_cos_c[i,j,k],theta_sin_c[i,j,k], theta_dot_c[i,j,k]]
+                centers.append(c)
 
     centers = np.asarray(centers)
-    return centers
 
+    return centers
 
 if __name__ == "__main__":
     env = Continuous_Pendulum()
-    num_episodes = 5000
-    gamma = 0.9
-    learning_rate = 0.01
-    value_step_size = 0.005
-
-    th_low = -np.pi
-    th_high = np.pi
-    th_dot_low = -8.0
-    th_dot_high = 8.0
-    no_rbf = 4
+    num_episodes = 2000
+    gamma = 0.99
+    learning_rate = 0.0001
+    value_step_size = 0.05
+    #
+    # th_low = -np.pi
+    # th_high = np.pi
+    # th_dot_low = -8.0
+    # th_dot_high = 8.0
+    # # for normalised states
+    # th_low = -1.0
+    # th_high = 1.0
+    # th_dot_low = -1.0
+    # th_dot_high = 1.0
+    high = [1.0,1.0,1.0]
+    low = [-1.0,-1.0,-1.0]
+    no_rbf = 6
     rbf_sigma = 1.0/(no_rbf - 1)
-    centers = computeRBFcenters(th_low, th_high, th_dot_low, th_dot_high, no_rbf)
+
+    centers = computeRBFcenters(high, low, no_rbf)
     no_centers = len(centers)
 
 
 
     # TODO: define num_states and num_actions
-    policy = ContinuousPolicy(2,1,no_centers)
+    policy = ContinuousPolicy(3,1,no_centers)
     value_estimator = LinearValueEstimator(no_centers)
-    reinforce(env, policy, value_estimator, gamma, num_episodes,value_step_size, learning_rate,True)
+    score = reinforce(env, policy, value_estimator, gamma, num_episodes,value_step_size, learning_rate,True)
 
-    # Test time
-    state = env.reset()
-    state = compute2dstate(state)
-    feature_state = rbf(state, centers, rbf_sigma)
-    # env.print()
-    done = False
-    state_hist = []
-    while not done:
-        action = policy.act(feature_state)
-
-        state, reward, done, blah = env.step(action)
-        state_hist.append(state)
-        state = compute2dstate(state)
-        feature_state = rbf(state, centers, rbf_sigma)
-
-    # Plotting test time results
-    state_hist = np.array(state_hist)
-    plt.plot(state_hist[0, :])
-    plt.xlabel("time (s)")
-    plt.ylabel("angle (rad)")
+    # # Test time
+    # state = env.reset()
+    # # state = compute2dstate(state)
+    # feature_state = rbf(state, centers, rbf_sigma)
+    # # env.print()
+    # done = False
+    # state_hist = []
+    # while not done:
+    #     action = policy.act(feature_state)
+    #
+    #     state, reward, done, blah = env.step(action)
+    #     state_hist.append(state)
+    #     # state = compute2dstate(state)
+    #     feature_state = rbf(state, centers, rbf_sigma)
+    #
+    # # Plotting test time results
+    # state_hist = np.array(state_hist)
+    # plt.plot(state_hist[:, 0])
+    # plt.xlabel("time (s)")
+    # plt.ylabel("angle (rad)")
+    # plt.show()
+    plt.plot(score)
+    plt.xlabel("Number of Episodes")
+    plt.ylabel("Rewards")
     plt.show()
